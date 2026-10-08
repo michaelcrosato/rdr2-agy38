@@ -1640,6 +1640,22 @@ class Humanoid {
     } else if (st === 'crown') {
       for (const k of [-1, 0, 1]) { const p = Sp(J.head, 0, k * R * .6, R * .9), q = Sp(J.head, 0, k * R * .6, R * 1.6); px.line(g, p[0], p[1], q[0], q[1], c, 2); }
       const a = Sp(J.head, 0, -R * .8, R * .85), b = Sp(J.head, 0, R * .8, R * .85); px.line(g, a[0], a[1], b[0], b[1], c, 2);
+    } else if (st === 'cowboy' || st === 'stetson') {
+      const cr = Sp(J.head, 0, 0, R * 1.05), brimF = Sp(J.head, R * 1.4, 0, R * .15), brimB = Sp(J.head, -R * 1.2, 0, R * .15);
+      const brimL = Sp(J.head, 0, -R * 1.35, R * .3), brimR = Sp(J.head, 0, R * 1.35, R * .3);
+      px.ell(g, (brimF[0] + brimB[0]) / 2, (brimF[1] + brimB[1]) / 2, r * 1.35, r * .7, dk);
+      px.disc(g, cr[0], cr[1], r * .78, c);
+      px.line(g, brimL[0], brimL[1], brimR[0], brimR[1], shade(c, -.2), 1);
+      px.rect(g, cr[0] - Math.round(r * .4), cr[1] - 1, Math.round(r * .8), 2, '#18120c'); // hat band
+    } else if (st === 'bowler' || st === 'derby') {
+      const br = Sp(J.head, 0, 0, R * .15), cr = Sp(J.head, 0, 0, R * .9);
+      px.ell(g, br[0], br[1], r * 1.15, r * .65, dk);
+      px.disc(g, cr[0], cr[1], r * .75, c);
+      px.rect(g, cr[0] - Math.round(r * .35), cr[1] + Math.round(r * .2), Math.round(r * .7), 1, '#151515');
+    } else if (st === 'sombrero') {
+      const br = Sp(J.head, 0, 0, R * .2), cr = Sp(J.head, 0, 0, R * 1.2);
+      px.ell(g, br[0], br[1], r * 1.6, r * .9, c);
+      px.disc(g, cr[0], cr[1], r * .85, dk);
     }
   }
 }
@@ -1808,6 +1824,272 @@ class Blob {
   }
 }
 E.Blob = Blob;
+
+// ---- 11B. WESTERN HORSE & VEHICLES: Procedural 3D rigs for the frontier ----
+class WesternHorse {
+  constructor(o = {}) {
+    const breedColors = {
+      thoroughbred: { coat: '#6b4226', coatDk: '#422513', coatLt: '#8c5934', legs: '#24140a', mane: '#120b06', tail: '#120b06', saddle: '#3e2213', blanket: '#8a2b2b' },
+      arabian: { coat: '#e8e4dc', coatDk: '#b8b2a6', coatLt: '#ffffff', legs: '#d4cec2', mane: '#dedad0', tail: '#dedad0', saddle: '#2e2622', blanket: '#2d4b68' },
+      mustang: { coat: '#c29b53', coatDk: '#8c6b2e', coatLt: '#dec27c', legs: '#2b2118', mane: '#19130e', tail: '#19130e', saddle: '#4a2c16', blanket: '#965a25' },
+      warhorse: { coat: '#824838', coatDk: '#592c20', coatLt: '#a8614d', legs: '#3b1f17', mane: '#1c100c', tail: '#1c100c', saddle: '#241a15', blanket: '#3a5a40' },
+      shire: { coat: '#1a1918', coatDk: '#0d0d0c', coatLt: '#2d2c2a', legs: '#ffffff', mane: '#0f0e0e', tail: '#0f0e0e', saddle: '#442818', blanket: '#7a2222' },
+      foxtrotter: { coat: '#a89078', coatDk: '#73604f', coatLt: '#c7b39f', legs: '#4f3e30', mane: '#241e17', tail: '#241e17', saddle: '#3b2518', blanket: '#a87a2a' }
+    };
+    const breed = o.breed || 'thoroughbred';
+    this.o = Object.assign({ size: 1.15, breed }, o);
+    this.C = Object.assign({}, breedColors[breed] || breedColors.thoroughbred, o.colors || {});
+    this.t = 0;
+    this.facing = 0;
+    this.speed = 0;
+    this.gait = 'idle';
+    this.rear = 0;
+    this.rearV = 0;
+    this.stridePhase = 0;
+  }
+  update(dt, s = {}) {
+    this.t += dt;
+    if (s.facing !== undefined) this.facing = s.facing;
+    const v = Math.hypot(s.vx || 0, s.vy || 0);
+    this.speed = lerp(this.speed, v, Math.min(1, dt * 10));
+    if (s.rearing) {
+      this.rear = approach(this.rear, 1, dt * 4);
+      this.gait = 'rear';
+    } else {
+      this.rear = approach(this.rear, 0, dt * 5);
+      if (this.speed > 130) { this.gait = 'gallop'; this.stridePhase += dt * 18; }
+      else if (this.speed > 60) { this.gait = 'trot'; this.stridePhase += dt * 12; }
+      else if (this.speed > 5) { this.gait = 'walk'; this.stridePhase += dt * 7; }
+      else { this.gait = 'idle'; this.stridePhase += dt * 2; }
+    }
+  }
+  riderOffset() {
+    const cf = Math.cos(this.facing), sf = Math.sin(this.facing);
+    const rearBack = -this.rear * 4.5;
+    const rearUp = this.rear * 7.5;
+    const bob = Math.sin(this.stridePhase * 2) * (this.speed > 60 ? 1.4 : 0.4);
+    return [
+      cf * (-0.8 + rearBack) - sf * 0,
+      sf * (-0.8 + rearBack) + cf * 0,
+      13.5 + rearUp + bob
+    ];
+  }
+  draw(g, ox, oy, view) {
+    const C = this.C, sc = view.scale * this.o.size;
+    const cf = Math.cos(this.facing), sf = Math.sin(this.facing);
+    const rearAngle = this.rear * 0.45;
+    const cosR = Math.cos(rearAngle), sinR = Math.sin(rearAngle);
+    
+    // Transform local body point (f: forward, r: right, z: up) to screen [sx, sy]
+    const proj = (f, r, z) => {
+      // tilt around rear pivot (f = -6, z = 6)
+      const pf = f - (-6), pz = z - 6;
+      const tf = pf * cosR - pz * sinR - 6;
+      const tz = pf * sinR + pz * cosR + 6;
+      const wx = cf * tf - sf * r;
+      const wy = sf * tf + cf * r;
+      const [px, py] = view.p(wx, wy, tz);
+      return [ox + px, oy + py];
+    };
+
+    // Stride offsets for 4 legs based on gait
+    let flA = 0, frA = 0, blA = 0, brA = 0;
+    if (this.gait === 'rear') {
+      flA = 0.9; frA = 0.8; blA = -0.15; brA = -0.15;
+    } else if (this.gait === 'gallop') {
+      flA = Math.sin(this.stridePhase) * 0.7;
+      frA = Math.sin(this.stridePhase + 0.3) * 0.65;
+      blA = Math.sin(this.stridePhase + Math.PI * 0.8) * 0.75;
+      brA = Math.sin(this.stridePhase + Math.PI * 0.9) * 0.7;
+    } else if (this.gait === 'trot') {
+      flA = Math.sin(this.stridePhase) * 0.5;
+      brA = Math.sin(this.stridePhase) * 0.5;
+      frA = -flA; blA = -brA;
+    } else if (this.gait === 'walk') {
+      flA = Math.sin(this.stridePhase) * 0.35;
+      brA = Math.sin(this.stridePhase + 1.5) * 0.35;
+      frA = Math.sin(this.stridePhase + 3) * 0.35;
+      blA = Math.sin(this.stridePhase + 4.5) * 0.35;
+    }
+
+    // Shadow on ground
+    const shP0 = proj(-6, 0, 0), shP1 = proj(6, 0, 0);
+    const shW = Math.max(8, Math.round(18 * sc)), shH = Math.max(4, Math.round(8 * sc));
+    px.ell(g, (shP0[0] + shP1[0]) / 2, (shP0[1] + shP1[1]) / 2, shW, shH, 'rgba(10,8,12,0.4)');
+
+    // Back legs (draw first for depth)
+    const drawLeg = (baseF, baseR, stride, isFront) => {
+      const hip = proj(baseF, baseR, isFront ? 9.5 : 10.5);
+      const kneeZ = isFront ? 5 : 5.5;
+      const kneeF = baseF + stride * (isFront ? 3.5 : -3.5);
+      const knee = proj(kneeF, baseR, kneeZ);
+      const hoofF = baseF + stride * 6;
+      const hoofZ = Math.max(0, isFront && this.rear > 0.1 ? 6 + this.rear * 8 : (stride > 0 ? stride * 2.5 : 0));
+      const hoof = proj(hoofF, baseR, hoofZ);
+      
+      px.line(g, hip[0], hip[1], knee[0], knee[1], C.coatDk, Math.max(2, Math.round(3.5 * sc)));
+      px.line(g, knee[0], knee[1], hoof[0], hoof[1], C.legs, Math.max(1, Math.round(2.5 * sc)));
+      px.rect(g, hoof[0] - 1, hoof[1] - 1, Math.max(2, Math.round(3 * sc)), Math.max(2, Math.round(2 * sc)), '#120f0d');
+    };
+
+    // Right legs (far side in typical view)
+    drawLeg(5, 2.2, frA, true);
+    drawLeg(-5.5, 2.2, brA, false);
+
+    // Horse Torso (barrel, croup, chest)
+    const croup = proj(-6, 0, 11), withers = proj(4.5, 0, 12.5), chest = proj(7, 0, 10.5);
+    const belly = proj(-0.5, 0, 7.5);
+    
+    // Draw barrel contour
+    px.poly(g, [croup, withers, chest, belly], C.coat);
+    px.line(g, croup[0], croup[1], withers[0], withers[1], C.coatLt, Math.max(2, Math.round(4 * sc)));
+    px.line(g, chest[0], chest[1], belly[0], belly[1], C.coatDk, Math.max(2, Math.round(4 * sc)));
+
+    // Navajo Saddle Blanket & Western Saddle
+    const sadC = proj(-0.8, 0, 13), sadHorn = proj(1.2, 0, 15), sadCantle = proj(-2.8, 0, 14.2);
+    px.poly(g, [proj(-3.5, -2, 11.5), proj(2.5, -2, 11.5), proj(2.5, 2, 11.5), proj(-3.5, 2, 11.5)], C.blanket);
+    px.poly(g, [sadCantle, sadHorn, proj(0, -2, 12), proj(-1.5, -2, 12)], C.saddle);
+    px.line(g, sadHorn[0], sadHorn[1], sadCantle[0], sadCantle[1], shade(C.saddle, 0.2), 2);
+    // Brass stirrup hanging down
+    const stirrup = proj(-0.8, -2.5, 8);
+    px.line(g, sadC[0], sadC[1], stirrup[0], stirrup[1], '#1a1410', 1);
+    px.dot(g, stirrup[0], stirrup[1], '#d9b458');
+
+    // Tail (flowing with velocity)
+    const tailRoot = proj(-6.8, 0, 11);
+    const tailSway = Math.sin(this.stridePhase * 1.5) * (this.speed > 30 ? 3 : 1);
+    const tailTip = proj(-10.5 - (this.speed > 50 ? 3 : 0), tailSway, (this.speed > 60 ? 9 : 4));
+    px.line(g, tailRoot[0], tailRoot[1], tailTip[0], tailTip[1], C.tail, Math.max(2, Math.round(3.5 * sc)));
+
+    // Neck & Head
+    const neckBase = proj(4.5, 0, 12.5), poll = proj(7.8, 0, 18), muzzle = proj(11.2, 0, 15.5);
+    const jaw = proj(8.5, 0, 14.5);
+    px.poly(g, [neckBase, poll, muzzle, jaw, chest], C.coat);
+    px.line(g, neckBase[0], neckBase[1], poll[0], poll[1], C.mane, Math.max(2, Math.round(3 * sc))); // mane
+    
+    // Ears
+    const earL = proj(7.2, -1, 19.8), earR = proj(7.2, 1, 19.8);
+    px.line(g, poll[0], poll[1], earL[0], earL[1], C.coat, 2);
+    px.line(g, poll[0], poll[1], earR[0], earR[1], C.coatDk, 2);
+    
+    // Muzzle & Nostril & Eye
+    px.disc(g, muzzle[0], muzzle[1], Math.max(1, Math.round(2 * sc)), C.coatDk);
+    const eye = proj(8.8, -0.8, 16.8);
+    px.dot(g, eye[0], eye[1], '#1a110a');
+    if (this.o.breed === 'mustang' || this.o.breed === 'thoroughbred') {
+      const snip = proj(9.5, 0, 16.5);
+      px.dot(g, snip[0], snip[1], '#ffffff');
+    }
+
+    // Left legs (near side)
+    drawLeg(5, -2.2, flA, true);
+    drawLeg(-5.5, -2.2, blA, false);
+
+    // Bridle and Reins to saddle horn
+    px.line(g, poll[0], poll[1], jaw[0], jaw[1], '#2a1a12', 1);
+    px.line(g, jaw[0], jaw[1], sadHorn[0], sadHorn[1], '#1a100a', 1);
+  }
+}
+E.WesternHorse = WesternHorse;
+
+class Stagecoach {
+  constructor(o = {}) {
+    this.o = Object.assign({ scale: 1.2, color: '#682e18', trim: '#b88628' }, o);
+    this.t = 0; this.wheelRot = 0; this.facing = 0;
+  }
+  update(dt, s = {}) {
+    this.t += dt;
+    if (s.facing !== undefined) this.facing = s.facing;
+    const v = Math.hypot(s.vx || 0, s.vy || 0);
+    this.wheelRot += v * dt * 0.15;
+  }
+  draw(g, ox, oy, view) {
+    const sc = view.scale * this.o.scale;
+    const cf = Math.cos(this.facing), sf = Math.sin(this.facing);
+    const proj = (f, r, z) => {
+      const wx = cf * f - sf * r, wy = sf * f + cf * r;
+      const [px, py] = view.p(wx, wy, z);
+      return [ox + px, oy + py];
+    };
+
+    // 4 Wheels
+    const drawWheel = (f, r, rad) => {
+      const hub = proj(f, r, rad);
+      px.disc(g, hub[0], hub[1], Math.max(2, Math.round(rad * sc * 0.8)), '#362316');
+      px.disc(g, hub[0], hub[1], Math.max(1, Math.round((rad - 1) * sc * 0.8)), '#1a1410');
+      // spokes
+      for (let a = 0; a < 4; a++) {
+        const ang = this.wheelRot + a * Math.PI / 2;
+        const spk = [hub[0] + Math.cos(ang) * rad * sc * 0.7, hub[1] + Math.sin(ang) * rad * sc * 0.7];
+        px.line(g, hub[0], hub[1], spk[0], spk[1], '#8f653b', 1);
+      }
+    };
+    drawWheel(-10, 8, 5.5); drawWheel(-10, -8, 5.5);
+    drawWheel(10, 8, 4.5); drawWheel(10, -8, 4.5);
+
+    // Cabin Box
+    const c0 = proj(-12, -7, 6), c1 = proj(8, -7, 6), c2 = proj(8, -7, 18), c3 = proj(-12, -7, 18);
+    px.poly(g, [c0, c1, c2, c3], this.o.color);
+    // Roof & Trim
+    const r0 = proj(-13, -7.5, 18.5), r1 = proj(9, -7.5, 18.5);
+    px.line(g, r0[0], r0[1], r1[0], r1[1], this.o.trim, 2);
+    // Window
+    const w0 = proj(-4, -7, 11), w1 = proj(2, -7, 11), w2 = proj(2, -7, 16), w3 = proj(-4, -7, 16);
+    px.poly(g, [w0, w1, w2, w3], '#1c2833');
+    // Driver Box & Bench
+    const d0 = proj(8, -6, 12), d1 = proj(14, -6, 12), d2 = proj(14, -6, 7);
+    px.poly(g, [d0, d1, d2, proj(8, -6, 7)], '#452213');
+  }
+}
+E.Stagecoach = Stagecoach;
+
+class TrainLocomotive {
+  constructor(o = {}) {
+    this.o = Object.assign({ scale: 1.4 }, o);
+    this.t = 0; this.wheelRot = 0; this.steam = 0;
+  }
+  update(dt, s = {}) {
+    this.t += dt;
+    this.wheelRot += (s.speed || 40) * dt * 0.2;
+    this.steam = (this.steam + dt * 10) % 1;
+  }
+  draw(g, ox, oy, view) {
+    const sc = view.scale * this.o.scale;
+    const proj = (f, r, z) => {
+      const [px, py] = view.p(f, r, z);
+      return [ox + px, oy + py];
+    };
+    // Cowcatcher (wedge)
+    const cc0 = proj(24, 0, 1), ccL = proj(18, -7, 5), ccR = proj(18, 7, 5);
+    px.poly(g, [cc0, ccL, ccR], '#26292b');
+    // Boiler cylinder
+    const b0 = proj(-8, -6, 7), b1 = proj(18, -6, 7), b2 = proj(18, -6, 19), b3 = proj(-8, -6, 19);
+    px.poly(g, [b0, b1, b2, b3], '#1b1d1f');
+    // Brass bands around boiler
+    for (const bf of [-2, 6, 14]) {
+      const pTop = proj(bf, -6, 19), pBot = proj(bf, -6, 7);
+      px.line(g, pTop[0], pTop[1], pBot[0], pBot[1], '#d4ac0d', 2);
+    }
+    // Smokestack & Headlight
+    const stBot = proj(14, 0, 19), stTop = proj(14, 0, 26);
+    px.line(g, stBot[0], stBot[1], stTop[0], stTop[1], '#111214', Math.max(3, Math.round(5 * sc)));
+    const hl = proj(19, 0, 15);
+    px.disc(g, hl[0], hl[1], Math.max(2, Math.round(3 * sc)), '#f4d03f'); // bright lantern
+    // Cab at rear
+    const cab0 = proj(-20, -7.5, 6), cab1 = proj(-8, -7.5, 6), cab2 = proj(-8, -7.5, 23), cab3 = proj(-20, -7.5, 23);
+    px.poly(g, [cab0, cab1, cab2, cab3], '#3e2723'); // wooden cab
+    // Cab window
+    const cw0 = proj(-16, -7.5, 14), cw1 = proj(-10, -7.5, 14), cw2 = proj(-10, -7.5, 19), cw3 = proj(-16, -7.5, 19);
+    px.poly(g, [cw0, cw1, cw2, cw3], '#f9e79f'); // warm lantern glow inside
+    // Heavy drive wheels
+    for (const wf of [-14, -6, 2, 10]) {
+      const wHub = proj(wf, -8, 5.5);
+      px.disc(g, wHub[0], wHub[1], Math.max(3, Math.round(5 * sc)), '#17202a');
+      px.dot(g, wHub[0], wHub[1], '#b7950b');
+    }
+  }
+}
+E.TrainLocomotive = TrainLocomotive;
 
 // ---- 12. TILEMAP: ground-plane levels from ASCII rows (top-down, iso, three-quarter, brawler). Walls are extruded boxes baked per view ----
 function parseLevel(rows, legend = {}) {
